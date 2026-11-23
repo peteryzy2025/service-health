@@ -32,10 +32,12 @@ REST_FRAMEWORK = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 USE_TZ = True
 TIME_ZONE = "Asia/Shanghai"
-if os.getenv("POSTGRES_HOST"):
+if os.getenv("MYSQL_HOST"):
     DATABASES = {"default": {
-        "ENGINE": "django.db.backends.postgresql", "HOST": os.environ["POSTGRES_HOST"],
-        "NAME": "health", "USER": "health", "PASSWORD": os.environ["POSTGRES_PASSWORD"],
+        "ENGINE": "django.db.backends.mysql", "HOST": os.environ["MYSQL_HOST"],
+        "PORT": os.getenv("MYSQL_PORT", "3306"),
+        "NAME": "health", "USER": "health", "PASSWORD": os.environ["MYSQL_PASSWORD"],
+        "OPTIONS": {"charset": "utf8mb4", "isolation_level": "read committed"},
     }}
 else:
     DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "dev.sqlite3"}}

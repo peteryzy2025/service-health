@@ -9,7 +9,7 @@ def main():
     values = {
         "DJANGO_SECRET_KEY": secrets.token_urlsafe(48),
         "TOKEN_ENCRYPTION_KEY": base64.urlsafe_b64encode(secrets.token_bytes(32)).decode(),
-        "POSTGRES_PASSWORD": secrets.token_urlsafe(32),
+        "MYSQL_PASSWORD": secrets.token_urlsafe(32),
         "PROBE_ORIGINS": "http://web:8000",
         "DEMO_ENABLED": "1",
     }

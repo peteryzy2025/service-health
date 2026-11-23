@@ -1,6 +1,6 @@
 # 企业内网服务健康巡检系统
 
-Django / DRF 提供资产管理和按需 HTTP 巡检，PostgreSQL 保存执行记录和日报，Celery Worker 通过 Redis 接收 Beat 定时派发的任务。默认使用 Asia/Shanghai 业务日期。
+Django / DRF 提供资产管理和按需 HTTP 巡检，MySQL 8.4（InnoDB）保存执行记录和日报，Celery Worker 通过 Redis 接收 Beat 定时派发的任务。默认使用 Asia/Shanghai 业务日期。
 
 ## 启动与验收
 
@@ -12,6 +12,8 @@ docker compose up -d --build
 docker compose exec web python manage.py createsuperuser
 docker compose ps
 ```
+
+Compose 为 MySQL 创建独立的 health-mysql 数据卷。已有旧版 .env 的用户请保留原有加密密钥并新增随机 MYSQL_PASSWORD。旧库的业务数据需要单独导入，新建卷只运行 Django 迁移。测试使用独立的 test_health 库，容器初始化脚本仅为该测试库补充权限。
 
 初始化脚本用系统随机源创建本地 `.env`，已有文件时停止，避免更换数据库密码或 Fernet 密钥。Web、Worker 和 Beat 共享该配置。仅 Web 端口发布在宿主机回环地址。管理 API 使用 Django staff 账号和 HTTP Basic 鉴权；对外部署应使用 HTTPS。演示目标单独使用巡检 Bearer Token。
 
@@ -56,8 +58,8 @@ Invoke-RestMethod "$api/daily-health/?stat_date=$day" @auth
 
 - 创建服务、初始凭据和首条归属记录同事务提交。巡检先固定服务配置、团队、环境和凭据版本并提交 running 记录，再执行网络请求，最后保存终态。进程异常退出留下的 running 记录可按开始时间查询；仅终态参与统计。
 - 目标正常响应但状态码不符记为 unexpected_status；超时、TLS 错误、连接错误分别记录。X-Request-Duration-Ms 衡量端到端 API 耗时，CheckRun.duration_ms 衡量目标 HTTP 调用耗时。
-- Beat 每天 00:00、08:00、16:00 派发轮换。逐服务任务在 PostgreSQL 行锁下比较时段，再生成 32 字节随机 Token，以 Fernet 加密保存。重复或过期任务跳过。手动轮换以实际执行时刻为标记，可在同一时段立即演示。演示端读取共享凭据表；独立服务需要对接密钥发布机制。在途请求撞上轮换时，HTTP 401 会记录在原凭据版本下。
-- Beat 每天 00:00 触发前一业务日期日报。按完成时间使用左闭右开窗口，归属使用巡检快照。零样本的服务取当天最后有效的归属。PostgreSQL 事务级 advisory lock 按日期串行化重算，单次事务替换整天的数据。支持晚到记录补算。
+- Beat 每天 00:00、08:00、16:00 派发轮换。逐服务任务在 InnoDB 行锁下比较时段，再生成 32 字节随机 Token，以 Fernet 加密保存。重复或过期任务跳过。手动轮换以实际执行时刻为标记，可在同一时段立即演示。演示端读取共享凭据表；独立服务需要对接密钥发布机制。在途请求撞上轮换时，HTTP 401 会记录在原凭据版本下。
+- Beat 每天 00:00 触发前一业务日期日报。按完成时间使用左闭右开窗口，归属使用巡检快照。零样本的服务取当天最后有效的归属。事务先创建或锁定以业务日期为主键的 ReportDayLock 行，按日期串行化重算，单次事务替换整天的数据。支持晚到记录补算。
 - 8/10 表示十次按需观测中八次成功。采样频率由调用者决定，该指标不能推算全天的时间可用率。
 
 ## 测试和运维命令
@@ -73,4 +75,4 @@ docker compose exec web celery -A config call monitor.tasks.report_day --args='[
 
 `dispatch_rotation` 对本轮已更新的服务会跳过；`rotate_token` 用于立即轮换。部署一个 Beat 实例；Worker 可以增加。请持续保管 `TOKEN_ENCRYPTION_KEY`，已有密文依赖同一密钥。
 
-也可用 Python 3.13 创建虚拟环境，安装 `requirements.txt`，将 `.env` 的键值导入进程环境后运行 `python manage.py migrate` 和 `python manage.py test`。未设置 POSTGRES_HOST 时使用 SQLite，适合开发和测试。行锁与日报的跨进程串行写入应在 PostgreSQL 下验证。
+也可用 Python 3.13 创建虚拟环境，安装 `requirements.txt`，将 `.env` 的键值导入进程环境后运行 `python manage.py migrate` 和 `python manage.py test`。未设置 MYSQL_HOST 时使用 SQLite，适合开发和测试。行锁与日报的跨进程串行写入应在 MySQL 8 下验证。

@@ -7,12 +7,12 @@ from urllib.parse import urlsplit
 import requests
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import connection, transaction
+from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 from config.schedule import current_rotation_slot as rotation_slot
 
-from .models import Assignment, CheckRun, DailyHealthStat, Service, ServiceToken
+from .models import Assignment, CheckRun, DailyHealthStat, ReportDayLock, Service, ServiceToken
 
 
 def check_target(origin, path):
@@ -78,10 +78,8 @@ def inspect_service(service_id):
 
 @transaction.atomic
 def build_report(day):
-    if connection.vendor == "postgresql":
-        # Serialize replacement even when this day has no existing report rows.
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT pg_advisory_xact_lock(%s, %s)", [42710, day.toordinal()])
+    # Keep one persistent lock row even if the report for this day is empty.
+    ReportDayLock.objects.select_for_update().get_or_create(stat_date=day)
     tz = timezone.get_default_timezone()
     start = datetime.combine(day, time.min, tzinfo=tz)
     end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=tz)

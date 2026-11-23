@@ -65,6 +65,10 @@ class CheckRun(Ownership):
         indexes = [models.Index(fields=["service", "finished_at"])]
 
 
+class ReportDayLock(models.Model):
+    stat_date = models.DateField(primary_key=True)
+
+
 class DailyHealthStat(Ownership):
     stat_date = models.DateField(db_index=True)
     service = models.ForeignKey(Service, on_delete=models.PROTECT)

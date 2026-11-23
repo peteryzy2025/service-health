@@ -3,6 +3,6 @@ djangorestframework>=3.16,<4
 celery[redis]>=5.5,<6
 cryptography>=44,<50
 requests>=2.32,<3
-psycopg[binary]>=3.2,<4
+mysqlclient>=2.2.7,<3
 tzdata
 gunicorn>=23,<27

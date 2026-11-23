@@ -150,6 +150,7 @@ urlpatterns = [path("demo/services/<int:pk>/health/", demo_health)]
 class HttpIntegrationTests(LiveServerTestCase):
     def test_demo_roundtrip(self):
         with self.settings(PROBE_ORIGINS=[self.live_server_url]):
+            Environment.objects.get_or_create(code="dev", defaults={"name": "开发"})
             team = Team.objects.create(name="Web")
             serializer = ServiceSerializer(data=service_data(team, self.live_server_url))
             serializer.is_valid(raise_exception=True)
